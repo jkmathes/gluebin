@@ -46,10 +46,14 @@ func ProxyExecutable(payload []byte) {
 	dir := home + "/.gluebin/" + "blah"
 	executable := extractPayload(payload, dir)
 
-	_, missing := GetDependencies(dir + "/" + executable)
 	err = os.MkdirAll(dir + "/ld", os.ModePerm)
-	for _, m := range missing {
-		CopyFile(dir + "/libs/" + m, dir + "/ld/" + m)
+	avail := getLdConfig()
+	brought, err := ioutil.ReadDir(dir + "/libs"); bail(err)
+
+	for _, m := range brought {
+		if avail[m.Name()] == "" {
+			CopyFile(dir + "/libs/" + m.Name(), dir + "/ld/" + m.Name())
+		}
 	}
 
 	pwd, err := os.Getwd()
@@ -61,8 +65,8 @@ func ProxyExecutable(payload []byte) {
 		},
 		Files: []uintptr{0, 1, 2}, // print message to the same pty
 	}
-	_, _, err = syscall.StartProcess(dir + "/" + executable, os.Args, pa); bail(err)
-	//pid, err := syscall.ForkExec(dir + "/" + executable, os.Args, pa); bail(err)
+	err = syscall.Exec(dir + "/" + executable, os.Args, pa.Env); bail(err)
+	fmt.Printf("We shouldn't ever see this\n")
 }
 
 func extractPayload(payload []byte, dir string) string {
