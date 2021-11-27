@@ -5,8 +5,11 @@ _*This works only on ELF binaries*_
 To build:
 
 ```
-CGO_ENABLED=0 go build -o gluebin cmd/gluebin/main.go
+make
 ```
+
+Binary will `./build/gluebin`
+
 
 To run:
 
