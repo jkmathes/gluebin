@@ -1,5 +1,7 @@
 # gluebin
 
+_*This works only on ELF binaries*_
+
 To build:
 
 ```
