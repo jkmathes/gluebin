@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"debug/elf"
 	"fmt"
+	"github.com/google/uuid"
 	"io"
 	"io/ioutil"
 	"log"
@@ -13,7 +14,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"syscall"
-	"github.com/google/uuid"
 )
 
 func bail(err error) {
