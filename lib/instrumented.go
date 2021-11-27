@@ -16,6 +16,11 @@ import (
 	"syscall"
 )
 
+const (
+	PAYLOAD_SECTION = "gluebin_payload"
+	PAYLOAD_HOME = ".gluebin"
+)
+
 func bail(err error) {
 	if err != nil {
 		log.Fatal(err)
@@ -33,7 +38,7 @@ func IsInstrumented() (bool, []byte) {
 		bail(err)
 	}(e)
 
-	j := e.Section("gluebin_payload")
+	j := e.Section(PAYLOAD_SECTION)
 	if j == nil {
 		return false, nil
 	}
@@ -45,10 +50,10 @@ func IsInstrumented() (bool, []byte) {
 func ProxyExecutable(payload []byte) {
 	home, err := os.UserHomeDir(); bail(err)
 	u := uuid.New()
-	edir := home + "/.gluebin/" + u.String()
+	edir := home + "/" + PAYLOAD_HOME + "/" + u.String()
 	executable := extractPayload(payload, edir)
 
-	dir := home + "/.gluebin/" + executable
+	dir := home + "/" + PAYLOAD_HOME + "/" + executable
 	err = os.MkdirAll(dir + "/ld", os.ModePerm)
 	avail := getLdConfig()
 	brought, err := ioutil.ReadDir(edir + "/libs"); bail(err)
@@ -122,8 +127,7 @@ func extractPayload(payload []byte, dir string) string {
 }
 
 func addFileToPayload(tw *tar.Writer, file string, prefix string) {
-	f, err := os.Open(file)
-	bail(err)
+	f, err := os.Open(file); bail(err)
 	defer func(f *os.File) {
 		bail(f.Close())
 	}(f)
@@ -159,7 +163,7 @@ func CreatePayload(dir string, clone string) string {
 
 func AttachPayload(payload string, orig string, target string) {
 	// TODO Write this in go!
-	cmd := exec.Command("objcopy", "--add-section", "gluebin_payload=" + payload, orig, target)
+	cmd := exec.Command("objcopy", "--add-section", PAYLOAD_SECTION + "=" + payload, orig, target)
 	bail(cmd.Run())
 	bail(os.Remove(payload))
 }

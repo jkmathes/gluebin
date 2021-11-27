@@ -53,8 +53,7 @@ func main() {
 }
 
 func buildBinary(bin string, target string) {
-    me, err := os.Executable()
-    bail(err)
+    me, err := os.Executable(); bail(err)
     deps, missing := lib.GetDependencies(bin)
     if len(missing) > 0 {
         log.Fatal("are you sure this binary was compiled here?")
@@ -62,14 +61,14 @@ func buildBinary(bin string, target string) {
 
     fmt.Printf("Writing %q\n", target)
     dir, err := ioutil.TempDir("", "gluebin"); bail(err)
-    bail(os.MkdirAll(dir+"/libs", os.ModePerm))
+    bail(os.MkdirAll(dir + "/libs", os.ModePerm))
 
     for _, dep := range deps {
         base := filepath.Base(dep)
-        lib.CopyFile(dep, dir+"/libs/"+base)
+        lib.CopyFile(dep, dir + "/libs/" + base)
     }
-    lib.CopyFile(bin, dir+"/"+filepath.Base(bin))
-    err = os.Chmod(dir+"/"+filepath.Base(bin), 0755); bail(err)
+    lib.CopyFile(bin, dir + "/" + filepath.Base(bin))
+    err = os.Chmod(dir+ "/" + filepath.Base(bin), 0755); bail(err)
 
     p := lib.CreatePayload(dir, filepath.Base(bin))
     lib.AttachPayload(p, me, target)
