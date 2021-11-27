@@ -18,7 +18,7 @@ import (
 
 const (
 	PAYLOAD_SECTION = "gluebin_payload"
-	PAYLOAD_HOME = ".gluebin"
+	PAYLOAD_HOME    = ".gluebin"
 )
 
 func bail(err error) {
@@ -43,40 +43,46 @@ func IsInstrumented() (bool, []byte) {
 		return false, nil
 	}
 
-	b, err := j.Data(); bail(err)
+	b, err := j.Data()
+	bail(err)
 	return true, b
 }
 
 func ProxyExecutable(payload []byte) {
-	home, err := os.UserHomeDir(); bail(err)
+	home, err := os.UserHomeDir()
+	bail(err)
 	u := uuid.New()
 	edir := home + "/" + PAYLOAD_HOME + "/" + u.String()
 	executable := extractPayload(payload, edir)
 
 	dir := home + "/" + PAYLOAD_HOME + "/" + executable
-	err = os.MkdirAll(dir + "/ld", os.ModePerm)
+	err = os.MkdirAll(dir+"/ld", os.ModePerm)
 	avail := getLdConfig()
-	brought, err := ioutil.ReadDir(edir + "/libs"); bail(err)
+	brought, err := ioutil.ReadDir(edir + "/libs")
+	bail(err)
 
 	for _, m := range brought {
 		if avail[m.Name()] == "" {
-			CopyFile(edir + "/libs/" + m.Name(), dir + "/ld/" + m.Name())
+			CopyFile(edir+"/libs/"+m.Name(), dir+"/ld/"+m.Name())
 		}
 	}
-	CopyFile(edir + "/" + executable, dir + "/" + executable)
-	err = os.Chmod(dir + "/" + executable, 0755); bail(err)
-	err = os.RemoveAll(edir); bail(err)
+	CopyFile(edir+"/"+executable, dir+"/"+executable)
+	err = os.Chmod(dir+"/"+executable, 0755)
+	bail(err)
+	err = os.RemoveAll(edir)
+	bail(err)
 
 	pwd, err := os.Getwd()
 	pa := &syscall.ProcAttr{
 		Dir: pwd,
-		Env: append(os.Environ(), "LD_LIBRARY_PATH=" + dir + "/ld"),
+		Env: append(os.Environ(), "LD_LIBRARY_PATH="+dir+"/ld"),
 		Sys: &syscall.SysProcAttr{
 			Setsid: true,
 		},
 		Files: []uintptr{0, 1, 2}, // print message to the same pty
 	}
-	err = syscall.Exec(dir + "/" + executable, os.Args, pa.Env); bail(err)
+	err = syscall.Exec(dir+"/"+executable, os.Args, pa.Env)
+	bail(err)
 	fmt.Printf("We shouldn't ever see this\n")
 }
 
@@ -127,16 +133,20 @@ func extractPayload(payload []byte, dir string) string {
 }
 
 func addFileToPayload(tw *tar.Writer, file string, prefix string) {
-	f, err := os.Open(file); bail(err)
+	f, err := os.Open(file)
+	bail(err)
 	defer func(f *os.File) {
 		bail(f.Close())
 	}(f)
 
-	stat, err := f.Stat(); bail(err)
-	h, err := tar.FileInfoHeader(stat, stat.Name()); bail(err)
+	stat, err := f.Stat()
+	bail(err)
+	h, err := tar.FileInfoHeader(stat, stat.Name())
+	bail(err)
 	h.Name = prefix + stat.Name()
 	bail(tw.WriteHeader(h))
-	_, err = io.Copy(tw, f); bail(err)
+	_, err = io.Copy(tw, f)
+	bail(err)
 }
 
 func CreatePayload(dir string, clone string) string {
@@ -150,10 +160,10 @@ func CreatePayload(dir string, clone string) string {
 
 	for _, file := range files {
 		fmt.Printf("Adding %s\n", file.Name())
-		addFileToPayload(tw, dir + "/libs/" + file.Name(), "libs/")
+		addFileToPayload(tw, dir+"/libs/"+file.Name(), "libs/")
 	}
 
-	addFileToPayload(tw, dir + "/" + clone, "")
+	addFileToPayload(tw, dir+"/"+clone, "")
 
 	bail(tw.Close())
 	bail(gw.Close())
@@ -163,7 +173,7 @@ func CreatePayload(dir string, clone string) string {
 
 func AttachPayload(payload string, orig string, target string) {
 	// TODO Write this in go!
-	cmd := exec.Command("objcopy", "--add-section", PAYLOAD_SECTION + "=" + payload, orig, target)
+	cmd := exec.Command("objcopy", "--add-section", PAYLOAD_SECTION+"="+payload, orig, target)
 	bail(cmd.Run())
 	bail(os.Remove(payload))
 }
