@@ -54,10 +54,11 @@ func getBinaryDependencies(name string) []string {
 	return needed
 }
 
-func GetDependencies(name string) []string {
+func GetDependencies(name string) ([]string, []string) {
 	ldConfig := getLdConfig()
 	deps := map[string]string{}
 	work := make([]string, 0)
+	missing := make([]string, 0)
 
 	/**
 	 * Get the dynamic dependencies of the binary,
@@ -72,6 +73,9 @@ func GetDependencies(name string) []string {
 
 		if len(deps[depName]) == 0 {
 			deps[depName] = ldConfig[depName]
+			if len(ldConfig[depName]) == 0 {
+				missing = append(missing, depName)
+			}
 			work = append(work, getBinaryDependencies(ldConfig[depName])...)
 		}
 	}
@@ -80,5 +84,5 @@ func GetDependencies(name string) []string {
 	for _, v := range deps {
 		r = append(r, v)
 	}
-	return r
+	return r, missing
 }

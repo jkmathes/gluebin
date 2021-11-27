@@ -2,6 +2,7 @@ package lib
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"debug/elf"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 )
 
 func bail(err error) {
@@ -18,7 +20,7 @@ func bail(err error) {
 	}
 }
 
-func IsInstrumented() bool {
+func IsInstrumented() (bool, []byte) {
 	me, err := os.Executable()
 	bail(err)
 
@@ -31,21 +33,59 @@ func IsInstrumented() bool {
 
 	j := e.Section("gluebin_payload")
 	if j == nil {
-		return false
+		return false, nil
 	}
 
-	b, err := j.Data()
+	b, err := j.Data(); bail(err)
+	return true, b
+}
+
+func ProxyExecutable(payload []byte) {
+	home, err := os.UserHomeDir(); bail(err)
+	dir := home + "/.gluebin/" + "blah"
+	extractPayload(payload, dir)
+}
+
+func extractPayload(payload []byte, dir string) {
+	err := os.MkdirAll(dir, os.ModePerm)
 	bail(err)
+	reader := bytes.NewReader(payload)
+	gr, err := gzip.NewReader(reader)
+	bail(err)
+	tr := tar.NewReader(gr)
+	bail(err)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		} else {
+			bail(err)
+		}
 
-	fmt.Printf("%s\n", string(b[:]))
-	return true
+		fmt.Printf("%q\n", header)
+
+		target := dir + "/" + header.Name
+		if header.Typeflag == tar.TypeDir {
+			err = os.MkdirAll(target, os.FileMode(header.Mode))
+			bail(err)
+		} else {
+			err = os.MkdirAll(filepath.Dir(target), os.ModePerm)
+			bail(err)
+			f, err := os.Create(target)
+			bail(err)
+			_, err = io.Copy(f, tr)
+			bail(err)
+			err = f.Close()
+			bail(err)
+		}
+		err = os.Chmod(target, os.FileMode(header.Mode))
+		bail(err)
+		err = os.Chtimes(target, header.AccessTime, header.ModTime)
+		bail(err)
+	}
 }
 
-func ProxyExecutable() {
-
-}
-
-func addFile(tw *tar.Writer, file string, prefix string) {
+func addFileToPayload(tw *tar.Writer, file string, prefix string) {
 	f, err := os.Open(file)
 	bail(err)
 	defer func(f *os.File) {
@@ -70,10 +110,10 @@ func CreatePayload(dir string, clone string) string {
 
 	for _, file := range files {
 		fmt.Printf("Adding %s\n", file.Name())
-		addFile(tw, dir + "/libs/" + file.Name(), "libs/")
+		addFileToPayload(tw, dir + "/libs/" + file.Name(), "libs/")
 	}
 
-	addFile(tw, dir + "/" + clone, "")
+	addFileToPayload(tw, dir + "/" + clone, "")
 
 	bail(tw.Close())
 	bail(gw.Close())

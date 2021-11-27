@@ -20,8 +20,9 @@ func bail(err error) {
 }
 
 func main() {
-    if lib.IsInstrumented() {
-        lib.ProxyExecutable()
+    instrumented, payload := lib.IsInstrumented()
+    if instrumented {
+        lib.ProxyExecutable(payload)
         return
     }
     app := &cli.App{
@@ -41,10 +42,13 @@ func main() {
                 log.Fatal("src binary and target binary really shouldn't be the same")
             }
 
+            deps, missing := lib.GetDependencies(bin)
+            if len(missing) > 0 {
+                log.Fatal("are you sure this binary was compiled here?")
+            }
+
             fmt.Printf("Writing %q\n", target)
-            deps := lib.GetDependencies(bin)
-            dir, err := ioutil.TempDir("", "gluebin")
-            bail(err)
+            dir, err := ioutil.TempDir("", "gluebin"); bail(err)
             bail(os.MkdirAll(dir + "/libs", os.ModePerm))
 
             for _, dep := range deps {
@@ -52,6 +56,7 @@ func main() {
                 copyFile(dep, dir + "/libs/" + base)
             }
             copyFile(bin, dir + "/" + filepath.Base(bin))
+            err = os.Chmod(dir + "/" + filepath.Base(bin), 0755); bail(err)
 
             p := lib.CreatePayload(dir, filepath.Base(bin))
             lib.AttachPayload(p, me, target)
