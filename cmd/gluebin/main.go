@@ -5,7 +5,6 @@ import (
     "fmt"
     "github.com/jkmathes/gluebin/lib"
     "github.com/urfave/cli/v2"
-    "io"
     "io/ioutil"
     "log"
     "os"
@@ -53,9 +52,9 @@ func main() {
 
             for _, dep := range deps {
                 base := filepath.Base(dep)
-                copyFile(dep, dir + "/libs/" + base)
+                lib.CopyFile(dep, dir + "/libs/" + base)
             }
-            copyFile(bin, dir + "/" + filepath.Base(bin))
+            lib.CopyFile(bin, dir + "/" + filepath.Base(bin))
             err = os.Chmod(dir + "/" + filepath.Base(bin), 0755); bail(err)
 
             p := lib.CreatePayload(dir, filepath.Base(bin))
@@ -69,21 +68,4 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
-}
-
-func copyFile(src string, dest string) {
-    d, err := os.Create(dest)
-    bail(err)
-    defer func(d *os.File) {
-        bail(d.Close())
-    }(d)
-
-    s, err := os.Open(src)
-    bail(err)
-    defer func(d *os.File) {
-        bail(d.Close())
-    }(s)
-
-    _, err = io.Copy(d, s)
-    bail(err)
 }

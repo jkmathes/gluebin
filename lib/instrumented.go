@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 )
 
 func bail(err error) {
@@ -43,10 +44,28 @@ func IsInstrumented() (bool, []byte) {
 func ProxyExecutable(payload []byte) {
 	home, err := os.UserHomeDir(); bail(err)
 	dir := home + "/.gluebin/" + "blah"
-	extractPayload(payload, dir)
+	executable := extractPayload(payload, dir)
+
+	_, missing := GetDependencies(dir + "/" + executable)
+	err = os.MkdirAll(dir + "/ld", os.ModePerm)
+	for _, m := range missing {
+		CopyFile(dir + "/libs/" + m, dir + "/ld/" + m)
+	}
+
+	pwd, err := os.Getwd()
+	pa := &syscall.ProcAttr{
+		Dir: pwd,
+		Env: append(os.Environ(), "LD_LIBRARY_PATH=" + dir + "/ld"),
+		Sys: &syscall.SysProcAttr{
+			Setsid: true,
+		},
+		Files: []uintptr{0, 1, 2}, // print message to the same pty
+	}
+	_, _, err = syscall.StartProcess(dir + "/" + executable, os.Args, pa); bail(err)
+	//pid, err := syscall.ForkExec(dir + "/" + executable, os.Args, pa); bail(err)
 }
 
-func extractPayload(payload []byte, dir string) {
+func extractPayload(payload []byte, dir string) string {
 	err := os.MkdirAll(dir, os.ModePerm)
 	bail(err)
 	reader := bytes.NewReader(payload)
@@ -54,6 +73,9 @@ func extractPayload(payload []byte, dir string) {
 	bail(err)
 	tr := tar.NewReader(gr)
 	bail(err)
+
+	ex := ""
+
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
@@ -61,8 +83,6 @@ func extractPayload(payload []byte, dir string) {
 		} else {
 			bail(err)
 		}
-
-		fmt.Printf("%q\n", header)
 
 		target := dir + "/" + header.Name
 		if header.Typeflag == tar.TypeDir {
@@ -80,9 +100,15 @@ func extractPayload(payload []byte, dir string) {
 		}
 		err = os.Chmod(target, os.FileMode(header.Mode))
 		bail(err)
+
+		if header.Mode == 0755 {
+			ex = header.Name
+		}
+
 		err = os.Chtimes(target, header.AccessTime, header.ModTime)
 		bail(err)
 	}
+	return ex
 }
 
 func addFileToPayload(tw *tar.Writer, file string, prefix string) {

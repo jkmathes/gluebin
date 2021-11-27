@@ -75,8 +75,9 @@ func GetDependencies(name string) ([]string, []string) {
 			deps[depName] = ldConfig[depName]
 			if len(ldConfig[depName]) == 0 {
 				missing = append(missing, depName)
+			} else {
+				work = append(work, getBinaryDependencies(ldConfig[depName])...)
 			}
-			work = append(work, getBinaryDependencies(ldConfig[depName])...)
 		}
 	}
 
