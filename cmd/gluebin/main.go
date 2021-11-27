@@ -31,7 +31,6 @@ func main() {
             if c.Args().Len() < 2 {
                 return errors.New("missing: binary file to convert and target binary to write")
             }
-            me, err := os.Executable(); bail(err)
 
             bin := c.Args().Get(0)
             target := c.Args().Get(1)
@@ -41,24 +40,7 @@ func main() {
                 log.Fatal("src binary and target binary really shouldn't be the same")
             }
 
-            deps, missing := lib.GetDependencies(bin)
-            if len(missing) > 0 {
-                log.Fatal("are you sure this binary was compiled here?")
-            }
-
-            fmt.Printf("Writing %q\n", target)
-            dir, err := ioutil.TempDir("", "gluebin"); bail(err)
-            bail(os.MkdirAll(dir + "/libs", os.ModePerm))
-
-            for _, dep := range deps {
-                base := filepath.Base(dep)
-                lib.CopyFile(dep, dir + "/libs/" + base)
-            }
-            lib.CopyFile(bin, dir + "/" + filepath.Base(bin))
-            err = os.Chmod(dir + "/" + filepath.Base(bin), 0755); bail(err)
-
-            p := lib.CreatePayload(dir, filepath.Base(bin))
-            lib.AttachPayload(p, me, target)
+            buildBinary(bin, target)
 
             return nil
         },
@@ -68,4 +50,28 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
+}
+
+func buildBinary(bin string, target string) {
+    me, err := os.Executable()
+    bail(err)
+    deps, missing := lib.GetDependencies(bin)
+    if len(missing) > 0 {
+        log.Fatal("are you sure this binary was compiled here?")
+    }
+
+    fmt.Printf("Writing %q\n", target)
+    dir, err := ioutil.TempDir("", "gluebin"); bail(err)
+    bail(os.MkdirAll(dir+"/libs", os.ModePerm))
+
+    for _, dep := range deps {
+        base := filepath.Base(dep)
+        lib.CopyFile(dep, dir+"/libs/"+base)
+    }
+    lib.CopyFile(bin, dir+"/"+filepath.Base(bin))
+    err = os.Chmod(dir+"/"+filepath.Base(bin), 0755); bail(err)
+
+    p := lib.CreatePayload(dir, filepath.Base(bin))
+    lib.AttachPayload(p, me, target)
+    err = os.RemoveAll(dir); bail(err)
 }

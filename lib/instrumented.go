@@ -161,4 +161,5 @@ func AttachPayload(payload string, orig string, target string) {
 	// TODO Write this in go!
 	cmd := exec.Command("objcopy", "--add-section", "gluebin_payload=" + payload, orig, target)
 	bail(cmd.Run())
+	bail(os.Remove(payload))
 }
