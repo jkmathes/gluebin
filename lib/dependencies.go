@@ -3,7 +3,6 @@ package lib
 import (
 	"bytes"
 	"debug/elf"
-	"log"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -41,12 +40,6 @@ func getLdConfig() map[string]string {
 		m[key] = path
 	}
 	return m
-}
-
-func WriteRPath(path string, rpath string) {
-	// TODO Write this in go!
-	cmd := exec.Command("patchelf", "--set-rpath", rpath, path)
-	cmd.Run()
 }
 
 func getBinaryDependencies(name string) []string {
@@ -88,10 +81,4 @@ func GetDependencies(name string) []string {
 		r = append(r, v)
 	}
 	return r
-}
-
-func bail(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
 }

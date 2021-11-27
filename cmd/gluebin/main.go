@@ -6,9 +6,9 @@ import (
     "github.com/jkmathes/gluebin/lib"
     "github.com/urfave/cli/v2"
     "io"
+    "io/ioutil"
     "log"
     "os"
-    "io/ioutil"
     "path/filepath"
 )
 import _ "github.com/urfave/cli/v2"
@@ -20,37 +20,42 @@ func bail(err error) {
 }
 
 func main() {
+    if lib.IsInstrumented() {
+        lib.ProxyExecutable()
+        return
+    }
     app := &cli.App{
         Name: "gluebin",
         Usage: "Create a static binary from a dynamic binary",
         Action: func(c *cli.Context) error {
-            if c.Args().Len() < 1 {
-                return errors.New("missing: binary file to convert")
+            if c.Args().Len() < 2 {
+                return errors.New("missing: binary file to convert and target binary to write")
             }
-            fmt.Printf("Converting %q\n", c.Args().Get(0))
+            me, err := os.Executable(); bail(err)
+
             bin := c.Args().Get(0)
+            target := c.Args().Get(1)
+
+            // TODO This needs to be more intelligent
+            if bin == target {
+                log.Fatal("src binary and target binary really shouldn't be the same")
+            }
+
+            fmt.Printf("Writing %q\n", target)
             deps := lib.GetDependencies(bin)
             dir, err := ioutil.TempDir("", "gluebin")
             bail(err)
-            fmt.Printf("Temp dir [%s]\n", dir)
+            bail(os.MkdirAll(dir + "/libs", os.ModePerm))
 
-            fmt.Printf("%q\n", lib.GetDependencies(bin))
             for _, dep := range deps {
                 base := filepath.Base(dep)
-                dest, err := os.Create(dir + "/" + base)
-                bail(err)
-
-                src, err := os.Open(dep)
-                bail(err)
-
-                _, err = io.Copy(dest, src)
-                bail(err)
-
-
-                bail(dest.Sync())
-                bail(src.Close())
-                bail(dest.Close())
+                copyFile(dep, dir + "/libs/" + base)
             }
+            copyFile(bin, dir + "/" + filepath.Base(bin))
+
+            p := lib.CreatePayload(dir, filepath.Base(bin))
+            lib.AttachPayload(p, me, target)
+
             return nil
         },
     }
@@ -59,4 +64,21 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
+}
+
+func copyFile(src string, dest string) {
+    d, err := os.Create(dest)
+    bail(err)
+    defer func(d *os.File) {
+        bail(d.Close())
+    }(d)
+
+    s, err := os.Open(src)
+    bail(err)
+    defer func(d *os.File) {
+        bail(d.Close())
+    }(s)
+
+    _, err = io.Copy(d, s)
+    bail(err)
 }
