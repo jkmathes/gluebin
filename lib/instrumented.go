@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"syscall"
+	"github.com/google/uuid"
 )
 
 func bail(err error) {
@@ -43,18 +44,23 @@ func IsInstrumented() (bool, []byte) {
 
 func ProxyExecutable(payload []byte) {
 	home, err := os.UserHomeDir(); bail(err)
-	dir := home + "/.gluebin/" + "blah"
-	executable := extractPayload(payload, dir)
+	u := uuid.New()
+	edir := home + "/.gluebin/" + u.String()
+	executable := extractPayload(payload, edir)
 
+	dir := home + "/.gluebin/" + executable
 	err = os.MkdirAll(dir + "/ld", os.ModePerm)
 	avail := getLdConfig()
-	brought, err := ioutil.ReadDir(dir + "/libs"); bail(err)
+	brought, err := ioutil.ReadDir(edir + "/libs"); bail(err)
 
 	for _, m := range brought {
 		if avail[m.Name()] == "" {
-			CopyFile(dir + "/libs/" + m.Name(), dir + "/ld/" + m.Name())
+			CopyFile(edir + "/libs/" + m.Name(), dir + "/ld/" + m.Name())
 		}
 	}
+	CopyFile(edir + "/" + executable, dir + "/" + executable)
+	err = os.Chmod(dir + "/" + executable, 0755); bail(err)
+	err = os.RemoveAll(edir); bail(err)
 
 	pwd, err := os.Getwd()
 	pa := &syscall.ProcAttr{
